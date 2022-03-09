@@ -1,0 +1,327 @@
+---
+geometry: margin=2cm
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+required <- c("gridExtra", "grDevices", "knitr", "tidyverse", "rvest", "lme4", "GGally", "lmerTest", "corrplot")
+
+for (i in required) {
+    if (!require(i, character.only = T)) {
+        install.packages(i, character.only = T)
+    }  
+    library(i, character.only = T)
+}
+knitr::opts_chunk$set(echo = T, cache = T, fig.show='asis', warnings = FALSE)
+```
+
+```{r load-data}
+aggregated <- read.csv("../data/clean_data/player_salary.csv")
+aggregated <- aggregated %>%
+    filter(Team != "Total")
+aggregated %>% colnames()
+```
+
+```{r add-mp}
+aggregated <- aggregated %>%
+    mutate(
+        Adjusted_Player = Salary_Player * 109140000 / Salary.Cap,
+        FG_Player_pm = FG_Player / MP_Player,
+        `X3P_Player_pm` = `X3P_Player` / MP_Player,
+        `X2P_Player_pm` = `X2P_Player` / MP_Player,
+        FT_Player_pm = FT_Player / MP_Player,
+        ORB_Player_pm = ORB_Player / MP_Player,
+        DRB_Player_pm = DRB_Player / MP_Player,
+        TRB_Player_pm = TRB_Player / MP_Player,
+        AST_Player_pm = AST_Player / MP_Player,
+        STL_Player_pm = STL_Player / MP_Player,
+        BLK_Player_pm = BLK_Player / MP_Player,
+        TOV_Player_pm = TOV_Player / MP_Player,
+        PF_Player_pm = PF_Player / MP_Player,
+        PTS_Player_pm = PTS_Player / MP_Player,
+)
+aggregated %>% head() %>% knitr::kable()
+```
+
+```{r}
+aggregated %>%
+  select(Year, Adjusted_Player) %>%
+  mutate(Year = as.factor(Year)) %>%
+  ggplot() +
+  geom_violin(aes(x = Year, y = Adjusted_Player))
+ggsave("~/Desktop/salary_violin.eps", width = 7, height = 5, units = "in")
+```
+
+
+```{r}
+aggregated %>%
+    ggplot(aes(x = MP_Player, y = X2P_Player, colour= Year)) +
+    geom_point() +
+    geom_smooth(method="lm", formula = "y ~ x") 
+ggsave("~/Desktop/original.eps", width = 5, height = 3, units = "in")
+```
+
+```{r}
+aggregated %>%
+    ggplot(aes(x = MP_Player, y = X2P_Player_pm, colour= Year)) +
+    geom_point() +
+    geom_smooth(method="lm", formula = "y ~ x") 
+ggsave("~/Desktop/processed.eps", width =5, height = 3, units = "in")
+```
+
+
+```{r 3p-density-by-pos}
+aggregated %>%
+    ggplot() +
+    geom_histogram(aes(x = X3P_Player_pm, y = ..density..), bins = 10, fill = "white", colour = "black") +
+    geom_density(aes(x = X3P_Player_pm, y = ..density..)) +
+    facet_wrap(~Pos)
+ggsave("../figures/exploratory_figures/3p-density-by-pos.png", width = 13, height = 10, units = "in")
+```
+```{r salary-density-by-pos}
+aggregated %>%
+    ggplot() +
+    geom_histogram(aes(x = Adjusted_Player, y = ..density..), bins = 20, fill = "white", colour = "black") +
+    geom_density(aes(x = Adjusted_Player, y = ..density..)) +
+    facet_wrap(~Pos)
+ggsave("../figures/exploratory_figures/salary-density-by-pos.png", width = 13, height = 10, units = "in")
+```
+```{r Adjusted-Google}
+aggregated %>%
+    ggplot(aes(x = `Google.Search.Trend` , y = log(Adjusted_Player), colour= Year)) +
+    geom_point() +
+    geom_smooth(method="lm", formula = 'y ~ x') 
+ggsave("../figures/exploratory_figures/Adjusted_Google.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-Age}
+aggregated %>%
+    ggplot(aes(x = Age, y = log(Adjusted_Player), colour= Year)) +
+    geom_point() +
+    geom_smooth(method="lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_Age.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-X2P}
+aggregated %>%
+    ggplot(aes(x = X2P_Player_pm, y = Adjusted_Player, colour = Year)) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "lm", formula = "y ~ x") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("~/Desktop/Adjusted_nat.eps", width = 6, height = 4, units = "in", device = grDevices::cairo_ps)
+```
+
+```{r}
+aggregated %>%
+    ggplot(aes(x = X3P_Player_pm, y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_X3P.png", width = 13, height = 10, units = "in")
+```
+
+```{r, Adjusted-FG}
+aggregated %>%
+    ggplot(aes(x = log(FG_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm", formula = "y ~ x") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_FG.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-FT}
+aggregated %>%
+    ggplot(aes(x = log(FT_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm", formula = "y ~ x") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_FT.png", width = 15, height = 10, units = "in")
+```
+
+```{r Adjusted-ORB}
+aggregated %>%
+    ggplot(aes(x = log(ORB_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_ORB.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-DRB}
+aggregated %>%
+    ggplot(aes(x = log(DRB_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_DRB.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-TRB}
+aggregated %>%
+    ggplot(aes(x = log(TRB_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_TRB.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-AST}
+aggregated %>%
+    ggplot(aes(x = log(AST_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_AST.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-STL}
+aggregated %>%
+    ggplot(aes(x = log(STL_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_STL.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-BLK}
+aggregated %>%
+    ggplot(aes(x = log(BLK_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_BLK.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-TOV}
+aggregated %>%
+    ggplot(aes(x = log(TOV_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_TOV.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-PF}
+aggregated %>%
+    ggplot(aes(x = log(PF_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_PF.png", width = 13, height = 10, units = "in")
+```
+
+```{r Adjusted-PTS}
+aggregated %>%
+    ggplot(aes(x = log(PTS_Player_pm), y = log(Adjusted_Player), colour = Year)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm") +
+    facet_wrap(~ I(MP_Player > 10) + Pos, nrow = 2)
+ggsave("../figures/exploratory_figures/Adjusted_PTS.png", width = 13, height = 10, units = "in")
+```
+
+
+
+```{r}
+aggregated %>%
+    select(Age,
+           `X3P_Player_pm`,
+           `X2P_Player_pm`,
+           TRB_Player_pm,
+           AST_Player_pm,
+           STL_Player_pm,
+           BLK_Player_pm,
+           PF_Player_pm,
+           `Google.Search.Trend`
+    ) %>%
+    mutate(
+        Age = exp(Age - 20),
+        `Google.Search.Trend` = exp(`Google.Search.Trend`)
+    ) %>%
+    log() %>%
+    rowwise() %>%
+    filter(!any(is.infinite(c_across(Age:`Google.Search.Trend`)))) %>%
+    na.omit() %>%
+    cor() %>%
+    corrplot(method = "color")
+#     ggpairs()
+# ggsave(
+#     "../figures/exploratory_figures/EDA_Pairs.png",
+#     width = 20,
+#     height = 20,
+#     units = "in"
+# )
+```
+
+```{r}
+selected <- aggregated %>%
+    mutate(Adjusted_Player = log(Adjusted_Player),
+           MP = MP_Player > 10,
+           Age = Age - 20,
+           `X3P_Player_pm` = log(`X3P_Player_pm`),
+           `X2P_Player_pm` = log(`X2P_Player_pm`),
+           TRB_Player_pm = log(TRB_Player_pm),
+           AST_Player_pm = log(AST_Player_pm),
+           STL_Player_pm = log(STL_Player_pm),
+           BLK_Player_pm = log(BLK_Player_pm),
+           PF_Player_pm = log(PF_Player_pm),
+           MP_Player = log(MP_Player)) %>%
+    select(MP, MP_Player, `X3P_Player_pm`, `X2P_Player_pm`,  
+           TRB_Player_pm, AST_Player_pm, STL_Player_pm, BLK_Player_pm, 
+           PF_Player_pm, Age, Adjusted_Player, `Google.Search.Trend`, 
+           Team, Player, Pos) %>%
+    rowwise() %>%
+    filter(!any(is.infinite(c_across(`X3P_Player_pm`:`Google.Search.Trend`))))
+```
+
+```{r}
+lmmod <- lmer(Adjusted_Player ~ 
+                  Age +
+                  MP +
+                  `Google.Search.Trend` +
+                  `X3P_Player_pm`:Pos:MP + 
+                  `X2P_Player_pm`:Pos:MP + 
+                  TRB_Player_pm:Pos:MP + 
+                  AST_Player_pm:Pos:MP + 
+                  STL_Player_pm:Pos:MP + 
+                  BLK_Player_pm:Pos:MP + 
+                  PF_Player_pm:Pos:MP + 
+                  (0 + `X3P_Player_pm` | Team) + 
+                  (0 + PF_Player_pm | Team),
+              data = selected, REML = T)
+summary(lmmod)
+```
+```{r}
+summary(lmmod)$coef %>% data.frame() %>% write.csv("~/Desktop/result.csv")
+```
+
+
+
+```{r}
+lmod <- lm(Adjusted_Player ~ 
+               `Google.Search.Trend` +
+               `X3P_Player_pm`:Pos:MP +
+               `X2P_Player_pm`:Pos:MP +
+               TRB_Player_pm:Pos:MP +
+               AST_Player_pm:Pos:MP +
+               STL_Player_pm:Pos:MP +
+               BLK_Player_pm:Pos:MP +
+               PF_Player_pm:Pos:MP + 
+               Age, 
+           data = selected)
+summary(lmod)
+```
+
+```{r}
+data.frame(summary(lmmod)$coef) %>% knitr::kable(digits = 2)
+```
+
+
+```{r}
+lattice::dotplot(lme4::ranef(lmmod, condVar = TRUE))
+```
+
+```{r}
+plot(lmmod)
+```
+
