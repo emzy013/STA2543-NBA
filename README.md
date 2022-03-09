@@ -10,7 +10,3 @@ We want to fit a model to predict NBA player's salary for 2021-2022 NBA season. 
 - Player salaries: hoopshype.com/salaries/players
 - Player search trend: google.com
 - NBA salary caps: spotrac.com/nba/cba/
-
-### Salary
-
-To more accurately represent salary, we calculate salary as the ratio/percentage of salary cap. The salary cap is a soft limit that a NBA team are allowed to pay their players.
